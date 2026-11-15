@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Collection {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  cards     Card[]
+  createdAt DateTime @default(now())
+}
+
+model Card {
+  id                 String    @id @default(cuid())
+  collectionId       String
+  collection         Collection @relation(fields: [collectionId], references: [id])
+  slug               String    @unique
+  tokenId            Int       @unique
+  serialNumber       Int
+  editionSize        Int       @default(99)
+  image              String    @default("/front.svg")
+  status             String    @default("UNCLAIMED") // UNCLAIMED | CLAIMED | LOST | REPLACED
+  isActive           Boolean   @default(true)
+  currentOwnerUserId String?
+  currentOwner       User?     @relation(fields: [currentOwnerUserId], references: [id])
+  ownerName          String?
+  claimedAt          DateTime?
+  chainOwner         String?
+  chainSyncedAt      DateTime?
+  currentVersionId   String?
+  versions           CardVersion[]
+  history            OwnershipHistory[]
+  createdAt          DateTime  @default(now())
+}
+
+model CardVersion {
+  id            String   @id @default(cuid())
+  cardId        String
+  card          Card     @relation(fields: [cardId], references: [id])
+  versionNumber Int
+  nfcTagUid     String?
+  nfcUrl        String?
+  status        String   @default("ACTIVE") // ACTIVE | LOST | REPLACED | INVALID
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String?  @unique
+  walletAddress String   @unique
+  cards         Card[]
+  createdAt     DateTime @default(now())
+}
+
+model OwnershipHistory {
+  id         String   @id @default(cuid())
+  cardId     String
+  card       Card     @relation(fields: [cardId], references: [id])
+  fromUserId String?
+  toUserId   String?
+  eventType  String   // mint | claim | transfer | lost_report | replacement
+  txHash     String?
+  notes      String?
+  createdAt  DateTime @default(now())
+}

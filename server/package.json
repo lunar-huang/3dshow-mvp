@@ -1,0 +1,20 @@
+{
+  "name": "3dshow-mvp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "postinstall": "prisma generate",
+    "start": "prisma db push --skip-generate && node index.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.2",
+    "express": "^4.19.2",
+    "prisma": "^5.19.0"
+  }
+}

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="672" viewBox="0 0 480 672">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b1f2a"/>
+      <stop offset="100%" stop-color="#232b45"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="672" rx="28" fill="url(#g)"/>
+  <rect x="18" y="18" width="444" height="636" rx="18" fill="none" stroke="#4c8dff" stroke-width="2"/>
+  <text x="240" y="320" text-anchor="middle" fill="#e8ecff" font-size="34" font-family="sans-serif" font-weight="700">3Dshow</text>
+  <text x="240" y="360" text-anchor="middle" fill="#8ea1cf" font-size="18" font-family="sans-serif">Collectible Card — Front</text>
+</svg>

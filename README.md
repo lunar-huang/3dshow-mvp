@@ -133,11 +133,24 @@ dashboard, real NFC writing, real authentication.
 ## Technical decisions
 
 ### Chain
-- Dev/demo: **Base Sepolia** (chain ID 84532)
-- Production target: **Base mainnet** (chain ID 8453)
-- Not Ethereum mainnet — per-mint gas there is multiples of a card's value.
-  Base is fractions of a cent.
-- Migration is cheap: same Solidity, swap RPC + chain ID.
+`hardhat.config.js` defines three networks; which one is live depends on
+`--network` and the local (gitignored) `.env`:
+
+| Network | Chain ID | Use |
+|---|---|---|
+| `localhost` | 31337 | Hardhat node |
+| `sepolia` | 11155111 | Ethereum Sepolia — current dev target |
+| `baseSepolia` | 84532 | Base testnet |
+
+Production target is **Base mainnet** (chain ID 8453), not Ethereum mainnet:
+per-mint gas on L1 is multiples of a card's value, Base is fractions of a
+cent. Migration is cheap — same Solidity, swap RPC + chain ID.
+
+Two config smells worth cleaning up:
+- Both `sepolia` and `baseSepolia` read the same `BASE_SEPOLIA_PRIVATE_KEY`
+  env var. Rename to something network-neutral.
+- `server/.env.example` defaults `RPC_URL` to Base Sepolia, which does not
+  match the current dev target.
 
 ### Wallets — Privy embedded, non-custodial
 The "no wallet, no seed phrase" promise in the intro is delivered by **Privy

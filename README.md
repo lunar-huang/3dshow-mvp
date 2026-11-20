@@ -129,3 +129,78 @@ top of the same API without backend changes. Swap in richer visuals
 **v0.1 — claim slice.** Issue → claim works end-to-end in both demo mode and
 against a real chain. Not yet built: transfer, lost/replacement flow, issuer
 dashboard, real NFC writing, real authentication.
+
+## Technical decisions
+
+### Chain
+`hardhat.config.js` defines three networks; which one is live depends on
+`--network` and the local (gitignored) `.env`:
+
+| Network | Chain ID | Use |
+|---|---|---|
+| `localhost` | 31337 | Hardhat node |
+| `sepolia` | 11155111 | Ethereum Sepolia — current dev target |
+| `baseSepolia` | 84532 | Base testnet |
+
+Production target is **Base mainnet** (chain ID 8453), not Ethereum mainnet:
+per-mint gas on L1 is multiples of a card's value, Base is fractions of a
+cent. Migration is cheap — same Solidity, swap RPC + chain ID.
+
+Two config smells worth cleaning up:
+- Both `sepolia` and `baseSepolia` read the same `BASE_SEPOLIA_PRIVATE_KEY`
+  env var. Rename to something network-neutral.
+- `server/.env.example` defaults `RPC_URL` to Base Sepolia, which does not
+  match the current dev target.
+
+### Wallets — Privy embedded, non-custodial
+The "no wallet, no seed phrase" promise in the intro is delivered by **Privy
+embedded wallets**, not by the backend holding user keys. This distinction is
+load-bearing:
+
+- **Delegated actions stay OFF.** It is opt-in, so the default is already
+  correct — just never enable it. With delegation on, the server can sign for
+  a user while they are offline, which is *control* over their assets even
+  though we never see a raw key.
+- Privy's architecture: 2-of-2 Shamir split (TEE share + auth share), key
+  reconstructed only inside the enclave. The app interacts via API credential
+  + authorization signature; it cannot export the key.
+- The issuer key held by the API is **ours**, used only to mint and sponsor
+  gas. It must never be extended to holding or moving user-owned tokens.
+
+### Token standard — open question
+Current contract is **ERC-721**, which fits the product: every physical card
+is individually serial-numbered (`001/099`) with its own NFC tag, so there is
+no "many identical copies of one design" case.
+
+Options if issuance gas becomes a problem:
+- **ERC721A** — keeps the 1-token-1-owner model, makes sequential batch
+  minting much cheaper. Most likely the right move.
+- **ERC-1155** — only worth it if a design ever ships as N identical copies.
+  Gains `mintBatch`, but `(id, address) → balance` is awkward against the
+  current `CardVersion` / `OwnershipHistory` model, which assumes one owner
+  per token.
+
+If ERC-1155 is ever adopted, three implementation traps:
+1. Metadata uses `uri(uint256)` with the `{id}` placeholder — clients
+   substitute **lowercase hex, zero-padded to 64 chars, no `0x`**. Getting it
+   wrong does not revert; the art silently fails to render.
+2. `totalSupply(id)` requires the **`ERC1155Supply`** extension. The base
+   OpenZeppelin `ERC1155` does not have it, and `007/099` display needs it.
+3. Receiving contracts must implement `onERC1155Received` or transfers
+   revert. Irrelevant for EOAs, relevant for any display/staking contract.
+
+### Regulatory boundaries (Singapore)
+Keep the project positioned as a *creator*, not a *service provider*:
+
+- **No delegated actions** — server-side signing for offline users looks like
+  custody.
+- **No marketplace** — minting and displaying is not the same as operating a
+  venue where users trade with each other.
+- **No token payments** — fiat only, so we never deal in digital payment
+  tokens.
+- **No redeemability or investment framing** — collectibles only.
+
+Context: Singapore's DTSP regime took effect 2025-06-30 and brings custody
+into scope, but MAS has granted no licences under it. A non-custodial
+architecture avoids the question entirely. *(Engineering notes, not legal
+advice.)*

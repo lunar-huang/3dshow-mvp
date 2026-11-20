@@ -24,4 +24,9 @@ export const api = {
   resetDemo: () => request('/demo/reset', { method: 'POST' }),
   getConfig: () => request('/config'),
   syncChain: () => request('/chain/sync', { method: 'POST' }),
+  getCollections: () => request('/collections'),
+  createCollection: (name) =>
+    request('/collections', { method: 'POST', body: JSON.stringify({ name }) }),
+  mintCard: (collectionSlug) =>
+    request(`/collections/${collectionSlug}/cards`, { method: 'POST', body: JSON.stringify({}) }),
 };

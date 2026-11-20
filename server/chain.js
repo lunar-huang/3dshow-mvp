@@ -7,6 +7,7 @@ const ABI = [
   'function nextTokenId() view returns (uint256)',
   'function claimTo(address user, uint256 tokenId)',
   'function setCurrentVersion(uint256 tokenId, uint256 version)',
+  'function mintToIssuer(uint256 version) returns (uint256)',
 ];
 
 let contract;
@@ -38,4 +39,11 @@ export async function claimTo(userWallet, tokenId) {
   const tx = await contract.claimTo(userWallet, tokenId);
   const receipt = await tx.wait();
   return receipt.hash;
+}
+
+export async function mintCard(version = 1) {
+  const tokenId = Number(await contract.nextTokenId());
+  const tx = await contract.mintToIssuer(version);
+  await tx.wait();
+  return tokenId;
 }

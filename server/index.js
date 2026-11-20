@@ -22,6 +22,27 @@ function serialDisplay(card) {
   return `${String(card.serialNumber).padStart(3, '0')}/${String(card.editionSize).padStart(3, '0')}`;
 }
 
+function slugify(text) {
+  return text
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 60);
+}
+
+async function uniqueSlug(base, exists) {
+  const candidate = slugify(base) || `c${Date.now().toString(36)}`;
+  let slug = candidate;
+  let n = 2;
+  while (await exists(slug)) {
+    slug = `${candidate}-${n}`;
+    n += 1;
+  }
+  return slug;
+}
+
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.get('/config', (req, res) => {
@@ -46,6 +67,79 @@ app.get('/collection/:slug', async (req, res) => {
         status: c.status,
       })),
     },
+  });
+});
+
+app.get('/collections', async (req, res) => {
+  const collections = await prisma.collection.findMany({ include: { cards: true } });
+  res.json({
+    ok: true,
+    collections: collections.map((col) => ({
+      name: col.name,
+      slug: col.slug,
+      cardCount: col.cards.length,
+    })),
+  });
+});
+
+app.post('/collections', async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ ok: false, error: 'name is required' });
+  }
+
+  const slug = await uniqueSlug(name, (s) => prisma.collection.findUnique({ where: { slug: s } }));
+  const collection = await prisma.collection.create({ data: { name: name.trim(), slug } });
+
+  res.json({ ok: true, collection: { name: collection.name, slug: collection.slug } });
+});
+
+app.post('/collections/:slug/cards', async (req, res) => {
+  const collection = await prisma.collection.findUnique({ where: { slug: req.params.slug } });
+  if (!collection) return res.status(404).json({ ok: false, error: 'Collection not found' });
+
+  const existingCount = await prisma.card.count({ where: { collectionId: collection.id } });
+  const { editionSize } = req.body || {};
+
+  let tokenId;
+  try {
+    if (DEMO_MODE) {
+      const maxCard = await prisma.card.findFirst({ orderBy: { tokenId: 'desc' } });
+      tokenId = (maxCard?.tokenId || 0) + 1;
+    } else {
+      tokenId = await chain.mintCard(1);
+    }
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+
+  const cardSlug = await uniqueSlug(`${collection.slug}-${existingCount + 1}`, (s) =>
+    prisma.card.findUnique({ where: { slug: s } })
+  );
+
+  const card = await prisma.card.create({
+    data: {
+      collectionId: collection.id,
+      slug: cardSlug,
+      tokenId,
+      serialNumber: existingCount + 1,
+      editionSize: editionSize || 99,
+      status: 'UNCLAIMED',
+    },
+  });
+
+  const version = await prisma.cardVersion.create({
+    data: { cardId: card.id, versionNumber: 1, status: 'ACTIVE' },
+  });
+  await prisma.card.update({ where: { id: card.id }, data: { currentVersionId: version.id } });
+
+  await prisma.ownershipHistory.create({
+    data: { cardId: card.id, eventType: 'mint', notes: DEMO_MODE ? 'Demo mint' : 'Minted via studio' },
+  });
+
+  res.json({
+    ok: true,
+    card: { slug: card.slug, tokenId: String(card.tokenId), serialDisplay: serialDisplay(card) },
   });
 });
 
